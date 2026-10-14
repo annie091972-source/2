@@ -8,9 +8,9 @@
 - seeds：21、22、80、443、445。
 - Houston：先合并TRLabel与TSLabel；检查无重叠后作为全部GT。
 - Trento：使用GT_Trento。
-- 每类训练数floor(N×0.05)，其余有标签中心像素测试；背景0不参与训练和精度计算。
+- 训练总数round-half-up(全部有标签像素数×0.05)。各类先按5%向下取整，再按小数余数从大到小补足名额，余数并列按类别编号；其余有标签中心像素测试，背景0不参与。整数采样无法保证每类和总体都恰好等于5.000%，实际比例会记录到config.json。
 - 每个seed重新划分；保存坐标及GT。新版本使用局部default_rng，不逐类重设全局随机数。
-- 当前实际数据：Houston训练745/测试14284；Trento训练1508/测试28706。
+- 当前实际数据：Houston训练751/测试14278；Trento训练1511/测试28703。
 - 训练测试中心不重叠，但随机划分下13×13邻域可能重叠。本协议不是空间隔离实验。
 - 与论文官方划分不同，不应直接将精度差异解释为模型复现错误。
 
@@ -140,3 +140,7 @@ gen_trento_split.py可独立生成5个seed的5%划分；训练会通过同一spl
 未执行完整500epochs×10次训练；当前验证环境是CPU，NVML/CUDA采样尚需在你的GPU上运行preflight验证。
 
 原论文引用：Jing Yao et al., Extended Vision Transformer (ExViT) for Land Use and Land Cover Classification: A Multimodal Deep Learning Framework, IEEE TGRS, 2023, DOI:10.1109/TGRS.2023.3284671。
+
+## 2026-10-14 采样数量修订
+
+修复逐类向下取整累积少取名额：现在各类分层配额之和等于全部GT的5%最近整数。只调整采样名额，不改模型、训练参数、patch大小或评估规则，也不保证精度低于旧设置。旧划分及其权重不应混用，新训练必须清空本次实验的旧输出目录或使用全新输出目录。
