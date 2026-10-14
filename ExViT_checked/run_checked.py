@@ -56,13 +56,29 @@ def load_data(root, dataset):
     x = np.concatenate((hs,lidar.astype(np.float32)),axis=2)
     return x,gt.astype(np.int16),hs.shape[2],k
 
+def stratified_train_counts(gt,k,ratio=0.05):
+    counts=np.bincount(gt.ravel().astype(int),minlength=k+1)[1:k+1]
+    desired=counts.astype(float)*ratio
+    quota=np.floor(desired).astype(int)
+    target=int(np.floor(int(counts.sum())*ratio+0.5))
+    remaining=target-int(quota.sum())
+    # Largest remainders first; ties use ascending class ID.
+    order=np.argsort(-(desired-quota),kind='stable')
+    quota[order[:remaining]]+=1
+    if np.any(quota<1) or np.any(quota>=counts):
+        raise ValueError('5% allocation cannot give every class nonempty train/test sets')
+    if int(quota.sum())!=target:
+        raise AssertionError('Training count differs from rounded global 5% target')
+    return quota
+
 def split(gt,k,seed):
     rng = np.random.default_rng(seed)
+    quota=stratified_train_counts(gt,k)
     tr,te = [],[]
     for c in range(1,k+1):
         pos = np.argwhere(gt==c)
         pos = pos[rng.permutation(len(pos))]
-        n = int(len(pos)*0.05)
+        n = int(quota[c-1])
         if n < 1 or n >= len(pos):
             raise ValueError(f'class {c}: cannot form nonempty 5%/95% split')
         tr.append(pos[:n]); te.append(pos[n:])
@@ -201,7 +217,12 @@ def main():
     if root.exists(): raise FileExistsError(f'{root} exists; choose a new --out to avoid overwriting')
     root.mkdir(parents=True)
     config={a:str(v) if isinstance(v,Path) else v for a,v in vars(args).items()}
-    config.update(protocol='all-GT per-class floor(5%); remainder test',python=platform.python_version(),
+    quota=stratified_train_counts(gt,k)
+    config.update(protocol='all-GT stratified 5% with largest remainder allocation; total round-half-up(N*0.05); remainder test',
+                  requested_train_ratio=0.05,train_count=int(quota.sum()),
+                  test_count=int(np.count_nonzero(gt)-quota.sum()),
+                  actual_train_ratio=float(quota.sum()/np.count_nonzero(gt)),
+                  per_class_train_counts=quota.tolist(),python=platform.python_version(),
                   torch=str(torch.__version__),cuda=torch.version.cuda,shape=list(x.shape),classes=k,
                   coordinate_base=0,label_map_base=1,metrics_OA_AA_unit='percent',
                   model_sha256=hashlib.sha256(Path(__file__).with_name('MViT_pytorch_upload.py').read_bytes()).hexdigest(),
