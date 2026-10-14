@@ -50,7 +50,13 @@ def main():
     check('train and test cover exactly all labeled GT',np.array_equal(np.sort(np.concatenate([train_ids,test_ids])),np.flatnonzero(gt.ravel()>0)))
     counts=np.bincount(gt.ravel(),minlength=k+1)[1:]
     actual=np.bincount(gt[tr[:,0],tr[:,1]],minlength=k+1)[1:]
-    check('per-class floor(5%) training counts',np.array_equal(actual,np.floor(counts*.05).astype(int)))
+    ideal=counts*.05
+    expected=np.floor(ideal).astype(int)
+    target=int(np.floor(int(counts.sum())*.05+.5))
+    ranked=sorted(range(k),key=lambda i:(-(ideal[i]-expected[i]),i))
+    for c in ranked[:target-int(expected.sum())]:expected[c]+=1
+    check('global training count equals rounded 5%',len(tr)==target)
+    check('per-class 5% largest-remainder allocation',np.array_equal(actual,expected))
     expected_tr,expected_te=split(gt,k,args.seed)
     check('saved split reproducible for this seed',np.array_equal(tr,expected_tr) and np.array_equal(te,expected_te))
     model_path=Path(__file__).with_name('MViT_pytorch_upload.py')
