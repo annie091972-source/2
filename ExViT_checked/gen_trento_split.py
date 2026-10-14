@@ -1,4 +1,4 @@
-"""Generate exactly the same five 5% GT splits as run_checked.py."""
+"""Generate the same globally rounded, stratified 5% GT splits as training."""
 import argparse
 import numpy as np
 from pathlib import Path
