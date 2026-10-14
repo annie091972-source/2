@@ -1,0 +1,6 @@
+# Install a CUDA-compatible PyTorch build separately for your GPU.
+numpy
+scipy
+einops
+Pillow
+nvidia-ml-py
